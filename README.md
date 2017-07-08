@@ -1,0 +1,5 @@
+# oikurs
+
+```
+$ cargo run -- ${URL}
+```

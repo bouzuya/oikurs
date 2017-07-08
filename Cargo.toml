@@ -4,3 +4,8 @@ version = "0.1.0"
 authors = ["bouzuya <m@bouzuya.net>"]
 
 [dependencies]
+hyper = "^0.10.12"
+hyper-native-tls = "^0.2.4"
+regex = "^0.2.2"
+scraper = "^0.4.0"
+url = "^1.5.1"
