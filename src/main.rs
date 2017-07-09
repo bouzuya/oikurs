@@ -13,11 +13,11 @@ use regex::Regex;
 use scraper::{Html, Selector};
 use std::env;
 use std::io::Read;
-use std::str::FromStr;
 use url::Url;
 
 struct Item {
     title: String,
+    points: i32,
     price: i32,
 }
 
@@ -56,10 +56,24 @@ fn parse(mut response: Response) -> Item {
     let price_element = document.select(&price_selector).nth(0).unwrap();
     let price_string = price_element.text().fold(String::new(), |a, s| a + s);
     // price_string -> price
-    let re = Regex::from_str("[^0-9]").unwrap();
-    let s = re.replace_all(&price_string, "");
-    let price = s.parse::<i32>().unwrap();
-    Item { title, price }
+    let price_re = Regex::new("[^0-9]").unwrap();
+    let price = price_re
+        .replace_all(&price_string, "")
+        .parse::<i32>()
+        .unwrap();
+    // select points element
+    let points_selector = Selector::parse(".series-price-box-price.amazon-points").unwrap();
+    let points_element = document.select(&points_selector).nth(0).unwrap();
+    let points_string = points_element.text().fold(String::new(), |a, s| a + s);
+    let points_re = Regex::new("([0-9]+)ポイント").unwrap();
+    let points = points_re
+        .captures(&points_string)
+        .map_or(0, |m| m.get(1).unwrap().as_str().parse::<i32>().unwrap());
+    Item {
+        title,
+        points,
+        price,
+    }
 }
 
 fn main() {
@@ -68,5 +82,10 @@ fn main() {
     let url = build_url(&url_string);
     let response = http_get(url, headers);
     let item = parse(response);
-    println!("{}: {}", item.title, item.price);
+    println!("{}: {} - {} ({}%) = {}",
+             item.title,
+             item.price,
+             item.points,
+             (f64::from(item.points) / f64::from(item.price) * 100.0).round(),
+             item.price - item.points);
 }
