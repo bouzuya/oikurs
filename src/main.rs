@@ -49,26 +49,36 @@ fn parse(mut response: Response) -> Item {
     let document = Html::parse_document(&html);
     // select title element
     let title_selector = Selector::parse(".series-detail-title").unwrap();
-    let title_element = document.select(&title_selector).nth(0).unwrap();
-    let title = title_element.text().fold(String::new(), |a, s| a + s);
+    let title = document
+        .select(&title_selector)
+        .nth(0)
+        .map_or(String::new(),
+                |e| e.text().fold(String::new(), |a, s| a + s));
     // select price element
     let price_selector = Selector::parse("#series-bulkPrice-text").unwrap();
-    let price_element = document.select(&price_selector).nth(0).unwrap();
-    let price_string = price_element.text().fold(String::new(), |a, s| a + s);
-    // price_string -> price
-    let price_re = Regex::new("[^0-9]").unwrap();
-    let price = price_re
-        .replace_all(&price_string, "")
-        .parse::<i32>()
-        .unwrap();
+    let price = document
+        .select(&price_selector)
+        .nth(0)
+        .map(|e| e.text().fold(String::new(), |a, s| a + s))
+        .map_or(0, |s| {
+            Regex::new("[^0-9]")
+                .unwrap()
+                .replace_all(&s, "")
+                .parse::<i32>()
+                .unwrap()
+        });
     // select points element
     let points_selector = Selector::parse(".series-price-box-price.amazon-points").unwrap();
-    let points_element = document.select(&points_selector).nth(0).unwrap();
-    let points_string = points_element.text().fold(String::new(), |a, s| a + s);
-    let points_re = Regex::new("([0-9]+)ポイント").unwrap();
-    let points = points_re
-        .captures(&points_string)
-        .map_or(0, |m| m.get(1).unwrap().as_str().parse::<i32>().unwrap());
+    let points = document
+        .select(&points_selector)
+        .nth(0)
+        .map(|e| e.text().fold(String::new(), |a, s| a + s))
+        .map_or(0, |s| {
+            Regex::new("([0-9]+)ポイント")
+                .unwrap()
+                .captures(&s)
+                .map_or(0, |m| m.get(1).unwrap().as_str().parse::<i32>().unwrap())
+        });
     Item {
         title,
         points,
