@@ -82,10 +82,10 @@ fn main() {
     let url = build_url(&url_string);
     let response = http_get(url, headers);
     let item = parse(response);
-    println!("{}: {} - {} ({}%) = {}",
-             item.title,
+    println!("{} = {} - {} ({}%): {}",
+             item.price - item.points,
              item.price,
              item.points,
              (f64::from(item.points) / f64::from(item.price) * 100.0).round(),
-             item.price - item.points);
+             item.title);
 }
