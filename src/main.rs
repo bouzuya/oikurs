@@ -82,10 +82,23 @@ fn parse(mut response: Response) -> Item {
                 .unwrap()
         });
     let price = cmp::max(regular_price, bulk_price);
+    // select discount price element
+    let discount_price_selector = Selector::parse(".series-price-box-price.discount-price").unwrap();
+    let discount_price = document
+        .select(&discount_price_selector)
+        .nth(0)
+        .map(|e| e.text().fold(String::new(), |a, s| a + s))
+        .map_or(0, |s| {
+            Regex::new("[^0-9]")
+                .unwrap()
+                .replace_all(&s, "")
+                .parse::<i32>()
+                .unwrap()
+        });
     // select points element
-    let points_selector = Selector::parse(".series-price-box-price.amazon-points").unwrap();
-    let points = document
-        .select(&points_selector)
+    let amazon_points_selector = Selector::parse(".series-price-box-price.amazon-points").unwrap();
+    let amazon_points = document
+        .select(&amazon_points_selector)
         .nth(0)
         .map(|e| e.text().fold(String::new(), |a, s| a + s))
         .map_or(0, |s| {
@@ -94,6 +107,7 @@ fn parse(mut response: Response) -> Item {
                 .captures(&s)
                 .map_or(0, |m| m.get(1).unwrap().as_str().parse::<i32>().unwrap())
         });
+    let points = cmp::max(regular_price - discount_price, amazon_points);
     Item {
         title,
         points,
