@@ -11,6 +11,7 @@ use hyper::net::HttpsConnector;
 use hyper_native_tls::NativeTlsClient;
 use regex::Regex;
 use scraper::{Html, Selector};
+use std::cmp;
 use std::env;
 use std::io::Read;
 use url::Url;
@@ -54,10 +55,10 @@ fn parse(mut response: Response) -> Item {
         .nth(0)
         .map_or(String::new(),
                 |e| e.text().fold(String::new(), |a, s| a + s));
-    // select price element
-    let price_selector = Selector::parse("#series-bulkPrice-text").unwrap();
-    let price = document
-        .select(&price_selector)
+    // select regular price element
+    let regular_price_selector = Selector::parse(".series-price-box-price.regular-price").unwrap();
+    let regular_price = document
+        .select(&regular_price_selector)
         .nth(0)
         .map(|e| e.text().fold(String::new(), |a, s| a + s))
         .map_or(0, |s| {
@@ -67,6 +68,20 @@ fn parse(mut response: Response) -> Item {
                 .parse::<i32>()
                 .unwrap()
         });
+    // select price element
+    let bulk_price_selector = Selector::parse("#series-bulkPrice-text").unwrap();
+    let bulk_price = document
+        .select(&bulk_price_selector)
+        .nth(0)
+        .map(|e| e.text().fold(String::new(), |a, s| a + s))
+        .map_or(0, |s| {
+            Regex::new("[^0-9]")
+                .unwrap()
+                .replace_all(&s, "")
+                .parse::<i32>()
+                .unwrap()
+        });
+    let price = cmp::max(regular_price, bulk_price);
     // select points element
     let points_selector = Selector::parse(".series-price-box-price.amazon-points").unwrap();
     let points = document
