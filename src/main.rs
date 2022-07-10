@@ -1,19 +1,9 @@
-extern crate hyper;
-extern crate hyper_native_tls;
-extern crate scraper;
-extern crate url;
-extern crate regex;
-
-use hyper::Client;
-use hyper::client::Response;
-use hyper::header::{Headers, UserAgent};
-use hyper::net::HttpsConnector;
-use hyper_native_tls::NativeTlsClient;
 use regex::Regex;
+use reqwest::header::USER_AGENT;
+use reqwest::Response;
 use scraper::{Html, Selector};
 use std::cmp;
 use std::env;
-use std::io::Read;
 use url::Url;
 
 struct Item {
@@ -22,30 +12,19 @@ struct Item {
     price: i32,
 }
 
-fn build_headers() -> Headers {
-    let mut headers = Headers::new();
-
+async fn http_get(url: Url) -> anyhow::Result<Response> {
     let product = "oikurs";
     let version = "0.1.0";
-    headers.set(UserAgent(format!("{}/{}", product, version)));
-
-    headers
+    let client = reqwest::Client::new();
+    Ok(client
+        .get(url)
+        .header(USER_AGENT, format!("{}/{}", product, version))
+        .send()
+        .await?)
 }
 
-fn build_url(url_string: &str) -> Url {
-    Url::parse(url_string).unwrap()
-}
-
-fn http_get(url: Url, headers: Headers) -> Response {
-    let ssl = NativeTlsClient::new().unwrap();
-    let connector = HttpsConnector::new(ssl);
-    let client = Client::with_connector(connector);
-    client.get(url).headers(headers).send().unwrap()
-}
-
-fn parse(mut response: Response) -> Item {
-    let mut out = String::new();
-    response.read_to_string(&mut out).unwrap();
+async fn parse(response: Response) -> anyhow::Result<Item> {
+    let out = response.text().await?;
     let html = out.to_string();
     let document = Html::parse_document(&html);
     // select title element
@@ -53,8 +32,9 @@ fn parse(mut response: Response) -> Item {
     let title = document
         .select(&title_selector)
         .nth(0)
-        .map_or(String::new(),
-                |e| e.text().fold(String::new(), |a, s| a + s));
+        .map_or(String::new(), |e| {
+            e.text().fold(String::new(), |a, s| a + s)
+        });
     // select regular price element
     let regular_price_selector = Selector::parse(".series-price-box-price.regular-price").unwrap();
     let regular_price = document
@@ -83,7 +63,8 @@ fn parse(mut response: Response) -> Item {
         });
     let price = cmp::max(regular_price, bulk_price);
     // select discount price element
-    let discount_price_selector = Selector::parse(".series-price-box-price.discount-price").unwrap();
+    let discount_price_selector =
+        Selector::parse(".series-price-box-price.discount-price").unwrap();
     let discount_price = document
         .select(&discount_price_selector)
         .nth(0)
@@ -108,23 +89,26 @@ fn parse(mut response: Response) -> Item {
                 .map_or(0, |m| m.get(1).unwrap().as_str().parse::<i32>().unwrap())
         });
     let points = cmp::max(regular_price - discount_price, amazon_points);
-    Item {
+    Ok(Item {
         title,
         points,
         price,
-    }
+    })
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let url_string = env::args().nth(1).unwrap();
-    let headers = build_headers();
-    let url = build_url(&url_string);
-    let response = http_get(url, headers);
-    let item = parse(response);
-    println!("{} = {} - {} ({}%): {}",
-             item.price - item.points,
-             item.price,
-             item.points,
-             (f64::from(item.points) / f64::from(item.price) * 100.0).round(),
-             item.title);
+    let url = Url::parse(url_string.as_str())?;
+    let response = http_get(url).await?;
+    let item = parse(response).await?;
+    println!(
+        "{} = {} - {} ({}%): {}",
+        item.price - item.points,
+        item.price,
+        item.points,
+        (f64::from(item.points) / f64::from(item.price) * 100.0).round(),
+        item.title
+    );
+    Ok(())
 }
