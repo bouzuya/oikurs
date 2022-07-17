@@ -1,6 +1,6 @@
 # oikurs
 
-```
+```console
 $ cargo run -- "${URL}"
 $ # or
 $ cargo build --release

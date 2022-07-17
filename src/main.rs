@@ -12,8 +12,8 @@ struct Item {
 }
 
 async fn http_get(url: Url) -> anyhow::Result<String> {
-    let product = "oikurs";
-    let version = "0.1.0";
+    let product = env!("CARGO_BIN_NAME");
+    let version = env!("CARGO_PKG_VERSION");
     let client = reqwest::Client::new();
     let response = client
         .get(url)
